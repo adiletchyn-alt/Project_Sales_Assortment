@@ -1,149 +1,152 @@
-# Анализ продаж и ассортимента: Power BI + Python
+# Sales & Assortment Analysis: Power BI + Python
 
-Аналитика продаж офисных товаров за январь–апрель 2022 года: ключевые метрики, ABC-XYZ-анализ ассортимента, RFM-сегментация клиентов, юнит-экономика подкатегорий и проверка качества данных.
+Sales analytics for an office-supplies business, January–April 2022: key metrics, ABC-XYZ assortment analysis, RFM customer segmentation, subcategory unit economics and a data-quality audit.
 
-Проект сделан двумя независимыми способами — **дашборд в Power BI** и **анализ в Python (pandas)**. Все базовые метрики совпадают до копейки, что подтверждает корректность расчётов.
+The project was built in two independent ways: a **Power BI dashboard** and an **analysis in Python (pandas)**. All core metrics match to the cent, which confirms the calculations are correct.
 
-![Дашборд Power BI](powerbi/screenshots/dashboard.png)
+*Русская версия: [README.ru.md](README.ru.md)*
 
-> Дашборд построен на исходных данных, поэтому рентабельность в нём — 23%. Почему эта цифра завышена, см. раздел «Проблемы качества данных».
+![Power BI dashboard](powerbi/screenshots/dashboard.png)
 
----
-
-## Главные выводы
-
-1. **Рентабельность в исходных данных завышена почти вдвое.** 11 строк, где прибыль больше выручки (например, выручка 24 — прибыль 44 689), дают 40% всей прибыли. Без них рентабельность **13,8%, а не 23%**. Перед принятием решений нужно проверить источник этих записей.
-2. **Одна подкатегория — основа бизнеса.** Telephones and Communication даёт 23% выручки и продаётся стабильнее всех (класс **AX**).
-3. **Главная зона риска — Copiers and Fax.** Вторая по выручке подкатегория (160 тыс.) при рентабельности **1%** и самом нестабильном спросе среди лидеров (класс **AZ**).
-4. **Четыре подкатегории работают в убыток**, в том числе крупная Storage & Organization (97 тыс. выручки, **−4,7%**). Кандидаты на пересмотр цен и закупки.
-5. **27% клиентов дают 55% выручки** (сегменты «Чемпионы» и «Лояльные»). 22 клиента «под угрозой ухода» приносят 12,7% выручки — первые кандидаты на кампанию возврата.
-6. **Почти половина заказов (277 из 571) убыточна** по итогу заказа, суммарно −51,6 тыс.
+> The dashboard is built on the raw data, so it shows a 23% margin. Why this number is overstated is explained in "Data Quality Issues" below.
 
 ---
 
-## Данные
+## Key Findings
 
-Учебный набор данных о продажах офисных товаров (регионы Канады): таблица фактов «Продажи» (730 строк) и 5 справочников — продукты, покупатели, менеджеры, даты заказов, стоимость доставки.
+1. **The margin in the raw data is overstated almost twofold.** 11 rows where profit is larger than revenue (for example, revenue 24 and profit 44,689) account for 40% of all profit. Without them the margin is **13.8%, not 23%**. The source of these records should be checked before any decisions are made.
+2. **One subcategory carries the business.** Telephones and Communication brings 23% of revenue and has the most stable sales of all (class **AX**).
+3. **The main risk area is Copiers and Fax.** It is the second-largest subcategory by revenue (160K), with a margin of only **1%** and the most unstable demand among the leaders (class **AZ**).
+4. **Four subcategories are loss-making**, including the large Storage & Organization (97K revenue, **−4.7%** margin). These are candidates for a review of prices and purchasing.
+5. **27% of customers bring 55% of revenue** ("Champions" and "Loyal" segments). 22 "At Risk" customers bring 12.7% of revenue and are the first candidates for a win-back campaign.
+6. **Almost half of all orders (277 of 571) are loss-making** at the order level, −51.6K in total.
 
-| Показатель | Значение |
+---
+
+## Data
+
+A training dataset of office-supplies sales (regions of Canada): a "Sales" fact table (730 rows) and 5 reference tables: products, customers, managers, order dates and shipping costs.
+
+| Metric | Value |
 |---|---|
-| Период | 01.01.2022 – 29.04.2022 |
-| Выручка | 1 103 256 |
-| Заказов | 571 |
-| Клиентов (АКБ) | 173 |
-| Товаров | 445 |
-| Средний чек | 1 932 |
+| Period | 01 Jan 2022 – 29 Apr 2022 |
+| Revenue | 1,103,256 |
+| Orders | 571 |
+| Active customers | 173 |
+| Products | 445 |
+| Average order value | 1,932 |
 
 ---
 
-## Что сделано
+## What Was Done
 
-### 1. Подготовка данных
-- Удаление пустых строк, обрезка пробелов, удаление дублей в справочниках.
-- Выручка и прибыль хранились как текст с **неразрывным пробелом** в разделителе тысяч — приведены к числам.
-- 16 товаров имеют чисто цифровые названия (например, «688», «3285»), Excel хранит их как числа. Без приведения к тексту 23 продажи теряли связь со справочником.
-- Модель «звезда»: объединение с проверкой `validate="many_to_one"`, чтобы дубли в справочниках не задваивали выручку.
+### 1. Data Preparation
+- Removed empty rows, trimmed spaces, removed duplicates in the reference tables.
+- Revenue and profit were stored as text with a **non-breaking space** as the thousands separator; converted to numbers.
+- 16 products have purely numeric names (e.g. "688", "3285"), which Excel stores as numbers. Without converting them to text, 23 sales lost their link to the product table.
+- Star schema: joins use the `validate="many_to_one"` check so that duplicates in reference tables cannot double the revenue.
 
-### 2. Метрики
-Выручка, прибыль, рентабельность, АКБ, средний чек, затраты на логистику, динамика по месяцам, убыточные заказы по менеджерам. Убыточным считается **заказ целиком** (сумма прибыли по всем его позициям < 0), а не отдельная строка.
+### 2. Metrics
+Revenue, profit, margin, active customers, average order value, shipping costs, monthly trend, loss-making orders by manager. An order counts as loss-making **as a whole** (total profit across all its lines < 0), not line by line.
 
-![Выручка по месяцам](images/01_monthly_revenue.png)
+![Monthly revenue](images/01_monthly_revenue.png)
 
-### 3. ABC-XYZ-анализ
-- **ABC** — вклад в выручку: A — первые 70%, B — до 90%, C — остальное.
-- **XYZ** — стабильность спроса: коэффициент вариации выручки по месяцам. X < 0,3, Y — 0,3–0,6, Z > 0,6.
+### 3. ABC-XYZ Analysis
+- **ABC**: contribution to revenue. A is the first 70%, B up to 90%, C the rest.
+- **XYZ**: demand stability, measured as the coefficient of variation of monthly revenue. X < 0.3, Y 0.3–0.6, Z > 0.6.
 
-Анализ сделан на уровне **подкатегорий**: 251 из 445 товаров продался всего один раз, и на уровне отдельных товаров XYZ неинформативен. Пороги XYZ увеличены относительно классических (10% / 25%) из-за короткого периода — 4 месяца.
+The analysis is done at the **subcategory** level: 251 of 445 products were sold only once, so XYZ at product level carries no information. The XYZ thresholds are higher than the classic ones (10% / 25%) because the period is short, only 4 months.
 
-![Матрица ABC-XYZ](images/02_abc_xyz_matrix.png)
+![ABC-XYZ matrix](images/02_abc_xyz_matrix.png)
 
-| | X (стабильно) | Y (колеблется) | Z (скачет) |
+| | X (stable) | Y (fluctuating) | Z (volatile) |
 |---|---|---|---|
 | **A** | Telephones | Appliances, Storage | Copiers and Fax, Binders |
 | **B** | Computer Peripherals | Office Furnishings, Office Machines | — |
 | **C** | Paper, Labels | — | Chairs, Tables, Envelopes, Scissors, Pens |
 
-### 4. RFM-сегментация
-Recency — дней с последней покупки, Frequency — число заказов, Monetary — выручка. Баллы 1–3 по каждому показателю, сегменты по правилам.
+### 4. RFM Segmentation
+Recency is days since the last purchase, Frequency is the number of orders, Monetary is revenue. Each is scored 1–3, and segments are assigned by rules.
 
-![RFM-сегменты](images/03_rfm_segments.png)
+![RFM segments](images/03_rfm_segments.png)
 
-| Сегмент | Клиентов | Доля выручки | Заказов в среднем | Дней с покупки |
+| Segment | Customers | Revenue share | Avg. orders | Days since purchase |
 |---|---|---|---|---|
-| Чемпионы | 26 | 29,8% | 7,1 | 6 |
-| Лояльные | 20 | 25,4% | 6,3 | 36 |
-| Требуют внимания | 64 | 25,1% | 2,6 | 20 |
-| Под угрозой ухода | 22 | 12,7% | 2,3 | 72 |
-| Потерянные | 30 | 5,3% | 1,0 | 83 |
-| Новые | 11 | 1,6% | 1,0 | 6 |
+| Champions | 26 | 29.8% | 7.1 | 6 |
+| Loyal | 20 | 25.4% | 6.3 | 36 |
+| Need Attention | 64 | 25.1% | 2.6 | 20 |
+| At Risk | 22 | 12.7% | 2.3 | 72 |
+| Lost | 30 | 5.3% | 1.0 | 83 |
+| New | 11 | 1.6% | 1.0 | 6 |
 
-### 5. Юнит-экономика и качество данных
+### 5. Unit Economics and Data Quality
 
-![Влияние аномалий](images/05_anomalies_effect.png)
+![Effect of anomalies](images/05_anomalies_effect.png)
 
-После исключения аномальных строк:
+After excluding the anomalous rows:
 
-![Рентабельность подкатегорий](images/04_margin_by_subcategory.png)
+![Margin by subcategory](images/04_margin_by_subcategory.png)
 
-Ещё один пример влияния аномалий: на исходных данных Express Air выглядит заметно выгоднее Regular Air (31% против 21% рентабельности), но на очищенных данных разницы практически нет (13,5% против 13,9%).
+Another example of how the anomalies distort the picture: on the raw data Express Air looks much more profitable than Regular Air (31% vs 21% margin), but on the cleaned data there is almost no difference (13.5% vs 13.9%).
 
 ---
 
-## Проблемы качества данных
+## Data Quality Issues
 
-| Проблема | Влияние | Решение |
+| Issue | Impact | Solution |
 |---|---|---|
-| 11 строк с прибылью больше выручки | Рентабельность 23% вместо 13,8% | Помечены флагом, исключены из анализа маржинальности |
-| 18 клиентов записаны в справочнике с разными сегментами | Распределение по сегментам зависит от порядка записей | Оставлена первая запись; требует уточнения у владельца данных |
-| Неразрывный пробел в числах | Числа читаются как текст | Очистка перед приведением типов |
-| Цифровые названия товаров | Потеря 23 продаж при объединении | Приведение столбца к тексту |
+| 11 rows where profit is larger than revenue | Margin 23% instead of 13.8% | Flagged and excluded from margin analysis |
+| 18 customers recorded with different segments in the customer table | Segment distribution depends on record order | First record kept; needs confirmation from the data owner |
+| Non-breaking space in numbers | Numbers read as text | Cleaned before type conversion |
+| Numeric product names | 23 sales lost in joins | Column converted to text |
 
 ---
 
-## Рекомендации
+## Recommendations
 
-1. Проверить источник 11 аномальных записей до использования показателя рентабельности в отчётности.
-2. Пересмотреть ценообразование или условия закупки в убыточных подкатегориях, в первую очередь Storage & Organization (класс A).
-3. Для Copiers and Fax (AZ, маржа 1%) — разобраться в причинах низкой маржи и нестабильного спроса, прежде чем наращивать закупки.
-4. Запустить кампанию возврата для сегмента «Под угрозой ухода» (22 клиента, 12,7% выручки).
-5. Разобрать убыточные заказы по менеджерам: у лидера — 83 убыточных заказа.
+1. Check the source of the 11 anomalous records before using the margin figure in reporting.
+2. Review pricing or purchasing terms in the loss-making subcategories, starting with Storage & Organization (class A).
+3. For Copiers and Fax (AZ, 1% margin), find the reasons for the low margin and unstable demand before increasing purchases.
+4. Launch a win-back campaign for the "At Risk" segment (22 customers, 12.7% of revenue).
+5. Review loss-making orders by manager: the top manager has 83 loss-making orders.
 
 ---
 
-## Инструменты
+## Tools
 
-- **Power BI**: Power Query, модель «звезда», собственный календарь, меры DAX, ABC в вычисляемых столбцах, карта, матрица с детализацией.
+- **Power BI**: Power Query, star schema, custom calendar table, DAX measures, ABC in calculated columns, map, drill-down matrix.
 - **Python**: pandas, matplotlib, Jupyter.
 
-## Структура репозитория
+## Repository Structure
 
 ```
 ├── data/
-│   └── sales_raw.xlsx              исходные данные
+│   └── sales_raw.xlsx              raw data
 ├── notebooks/
-│   └── sales_analysis.ipynb        анализ в Python
+│   └── sales_analysis.ipynb        Python analysis
 ├── powerbi/
-│   ├── sales_dashboard.pbix        дашборд Power BI
-│   └── screenshots/                скриншоты дашборда
-├── images/                         графики из ноутбука
+│   ├── sales_dashboard.pbix        Power BI dashboard
+│   └── screenshots/                dashboard screenshots
+├── images/                         charts from the notebook
 ├── requirements.txt
-└── README.md
+├── README.md
+└── README.ru.md                    Russian version
 ```
 
-## Как запустить
+## How to Run
 
 ```
 pip install -r requirements.txt
 jupyter notebook notebooks/sales_analysis.ipynb
 ```
 
-Дашборд: открыть `powerbi/sales_dashboard.pbix` в Power BI Desktop. Если данные не обновляются, укажите путь к `data/sales_raw.xlsx`: Главная → Преобразование данных → Настройки источника данных → Изменить источник.
+Dashboard: open `powerbi/sales_dashboard.pbix` in Power BI Desktop. If the data does not refresh, point it to `data/sales_raw.xlsx`: Home → Transform data → Data source settings → Change Source.
 
-## Ограничения
+## Limitations
 
-- Период — 4 месяца, поэтому нельзя оценить сезонность и полноценно построить когорты.
-- Пороги XYZ и RFM подобраны под короткий период и небольшую базу клиентов.
+- The period is only 4 months, so seasonality cannot be assessed and full cohort analysis is not possible.
+- The XYZ and RFM thresholds are tuned to the short period and the small customer base.
 
 ---
 
-**Автор:** Адилет Чыныбаев · GitHub: [adiletchyn-alt](https://github.com/adiletchyn-alt)
+**Author:** Adilet Chynybaev · GitHub: [adiletchyn-alt](https://github.com/adiletchyn-alt)
